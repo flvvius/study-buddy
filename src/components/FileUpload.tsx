@@ -19,20 +19,29 @@ function getCellStyleSignature(cell: ExcelJS.Cell): string {
   const fontColor = cell.font?.color;
   if (fontColor) {
     if (fontColor.argb) {
-      parts.push(`fc-argb:${fontColor.argb}`);
+      // Normalize black colors (FF000000) to not include them - they're default
+      if (fontColor.argb !== "FF000000") {
+        parts.push(`fc-argb:${fontColor.argb}`);
+      }
     }
     if (fontColor.theme !== undefined) {
-      parts.push(`fc-theme:${fontColor.theme}`);
+      // Theme 1 is typically black/default text, so only include non-default themes
+      // OR if there's a tint applied (which changes the color)
+      const tint = (fontColor as Record<string, unknown>).tint;
+      if (fontColor.theme !== 1 || tint !== undefined) {
+        parts.push(`fc-theme:${fontColor.theme}`);
+        if (tint !== undefined) {
+          parts.push(`fc-tint:${tint}`);
+        }
+      }
     }
     if ((fontColor as Record<string, unknown>).indexed !== undefined) {
       parts.push(
         `fc-indexed:${(fontColor as Record<string, unknown>).indexed}`
       );
     }
-    if ((fontColor as Record<string, unknown>).tint !== undefined) {
-      parts.push(`fc-tint:${(fontColor as Record<string, unknown>).tint}`);
-    }
   }
+  // Note: If fontColor is undefined, we don't add anything - this is treated as default (black)
 
   // Fill/background color - check all color representations
   const fill = cell.fill;
