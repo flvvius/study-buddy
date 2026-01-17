@@ -25,10 +25,12 @@ function getCellStyleSignature(cell: ExcelJS.Cell): string {
       parts.push(`fc-theme:${fontColor.theme}`);
     }
     if ((fontColor as Record<string, unknown>).indexed !== undefined) {
-      parts.push(`fc-indexed:${(fontColor as Record<string, unknown>).indexed}`);
+      parts.push(
+        `fc-indexed:${(fontColor as Record<string, unknown>).indexed}`
+      );
     }
-    if (fontColor.tint !== undefined) {
-      parts.push(`fc-tint:${fontColor.tint}`);
+    if ((fontColor as Record<string, unknown>).tint !== undefined) {
+      parts.push(`fc-tint:${(fontColor as Record<string, unknown>).tint}`);
     }
   }
 
@@ -43,8 +45,14 @@ function getCellStyleSignature(cell: ExcelJS.Cell): string {
       if (patternFill.fgColor.theme !== undefined) {
         parts.push(`bg-theme:${patternFill.fgColor.theme}`);
       }
-      if ((patternFill.fgColor as Record<string, unknown>).indexed !== undefined) {
-        parts.push(`bg-indexed:${(patternFill.fgColor as Record<string, unknown>).indexed}`);
+      if (
+        (patternFill.fgColor as Record<string, unknown>).indexed !== undefined
+      ) {
+        parts.push(
+          `bg-indexed:${
+            (patternFill.fgColor as Record<string, unknown>).indexed
+          }`
+        );
       }
     }
     if (patternFill.bgColor) {
@@ -101,34 +109,37 @@ function findOutlierIndex(signatures: string[]): number {
 // Extract plain text from a cell, handling rich text objects
 function getCellText(cell: ExcelJS.Cell): string {
   const value = cell.value;
-  
+
   // If it's null or undefined
   if (value == null) return "";
-  
+
   // If it's already a string
   if (typeof value === "string") return value.trim();
-  
+
   // If it's a number or boolean
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
-  
+
   // If it's a rich text object (has 'richText' property)
   if (typeof value === "object" && "richText" in value) {
     const richText = value as { richText: Array<{ text: string }> };
-    return richText.richText.map((rt) => rt.text).join("").trim();
+    return richText.richText
+      .map((rt) => rt.text)
+      .join("")
+      .trim();
   }
-  
+
   // If it's a formula result
   if (typeof value === "object" && "result" in value) {
     const formula = value as { result?: unknown };
     if (typeof formula.result === "string") return formula.result.trim();
     if (typeof formula.result === "number") return String(formula.result);
   }
-  
+
   // Fallback to cell.text which ExcelJS provides
   if (cell.text) return cell.text.trim();
-  
+
   // Last resort
   return String(value);
 }
@@ -144,7 +155,10 @@ export function FileUpload() {
       // Detect file type and read accordingly
       const fileName = file.name.toLowerCase();
       if (fileName.endsWith(".csv")) {
-        await workbook.csv.load(data);
+        // For CSV, create a stream from the file
+        const stream = new Blob([data]).stream();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await workbook.csv.read(stream as any);
       } else {
         await workbook.xlsx.load(data);
       }
@@ -175,7 +189,7 @@ export function FileUpload() {
         for (let col = 2; col <= cellCount; col++) {
           const cell = row.getCell(col);
           const text = getCellText(cell);
-          
+
           // Skip empty cells and cells that contain the question text (merged cells)
           if (text.length > 0 && text !== questionText) {
             optionCells.push(cell);
@@ -187,7 +201,9 @@ export function FileUpload() {
         if (optionValues.length < 2) return;
 
         // Get style signatures for each option cell
-        const signatures = optionCells.map((cell) => getCellStyleSignature(cell));
+        const signatures = optionCells.map((cell) =>
+          getCellStyleSignature(cell)
+        );
 
         // Find the outlier (correct answer)
         const correctAnswerIndex = findOutlierIndex(signatures);
@@ -280,7 +296,9 @@ export function FileUpload() {
             Each row: Question | Option 1 | Option 2 | Option 3 | ...
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            The correct answer should be <span className="font-medium">highlighted differently</span> (different color, bold, etc.)
+            The correct answer should be{" "}
+            <span className="font-medium">highlighted differently</span>{" "}
+            (different color, bold, etc.)
           </p>
         </div>
       </CardContent>
