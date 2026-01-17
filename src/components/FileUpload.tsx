@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import ExcelJS from "exceljs";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -84,6 +85,27 @@ function getCellStyleSignature(cell: ExcelJS.Cell): string {
   if (cell.font?.strike) parts.push("strike");
   if (cell.font?.name) parts.push(`fn:${cell.font.name}`);
   if (cell.font?.size) parts.push(`fs:${cell.font.size}`);
+
+  // Border styles - check if cell has any borders
+  const border = cell.border;
+  if (border) {
+    const borderParts: string[] = [];
+    if (border.top?.style) borderParts.push(`t:${border.top.style}`);
+    if (border.bottom?.style) borderParts.push(`b:${border.bottom.style}`);
+    if (border.left?.style) borderParts.push(`l:${border.left.style}`);
+    if (border.right?.style) borderParts.push(`r:${border.right.style}`);
+    if (border.top?.color?.argb)
+      borderParts.push(`tc:${border.top.color.argb}`);
+    if (border.bottom?.color?.argb)
+      borderParts.push(`bc:${border.bottom.color.argb}`);
+    if (border.left?.color?.argb)
+      borderParts.push(`lc:${border.left.color.argb}`);
+    if (border.right?.color?.argb)
+      borderParts.push(`rc:${border.right.color.argb}`);
+    if (borderParts.length > 0) {
+      parts.push(`border:${borderParts.join(",")}`);
+    }
+  }
 
   return parts.length > 0 ? parts.join("|") : "default";
 }
@@ -179,6 +201,7 @@ export function FileUpload() {
       }
 
       const questions: Question[] = [];
+      const rowsWithIdenticalStyling: number[] = [];
 
       worksheet.eachRow((row, rowNumber) => {
         // Get the actual cell count in this row
@@ -214,6 +237,13 @@ export function FileUpload() {
           getCellStyleSignature(cell)
         );
 
+        // Check if all signatures are identical (no styling difference detected)
+        const uniqueSignatures = new Set(signatures);
+        const hasUndetectedAnswer = uniqueSignatures.size === 1;
+        if (hasUndetectedAnswer) {
+          rowsWithIdenticalStyling.push(rowNumber);
+        }
+
         // Find the outlier (correct answer)
         const correctAnswerIndex = findOutlierIndex(signatures);
 
@@ -222,6 +252,7 @@ export function FileUpload() {
           question: questionText,
           options: optionValues,
           correctAnswerIndex,
+          hasUndetectedAnswer,
         });
       });
 
@@ -232,7 +263,25 @@ export function FileUpload() {
         return;
       }
 
-      console.log(`Loaded ${questions.length} questions`);
+      // Report rows with identical styling (likely using conditional formatting)
+      if (rowsWithIdenticalStyling.length > 0) {
+        toast.warning(
+          `${rowsWithIdenticalStyling.length} question(s) couldn't detect the correct answer`,
+          {
+            description: `Rows ${rowsWithIdenticalStyling.join(
+              ", "
+            )} use Excel conditional formatting which can't be read. The first option is assumed correct for these.`,
+            duration: 8000,
+          }
+        );
+      }
+
+      toast.success(`Loaded ${questions.length} questions`, {
+        description: `${
+          questions.length - rowsWithIdenticalStyling.length
+        } with detected correct answers`,
+        duration: 3000,
+      });
       setQuestions(questions);
     },
     [setQuestions]

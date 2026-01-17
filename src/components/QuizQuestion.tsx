@@ -56,6 +56,17 @@ export function QuizQuestion() {
           </span>
         </div>
         <Progress value={progress} className="h-2" />
+        {currentQuestion.hasUndetectedAnswer && (
+          <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <p className="text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
+              <span>⚠️</span>
+              <span>
+                Correct answer couldn't be detected from the Excel file
+                (conditional formatting). First option assumed correct.
+              </span>
+            </p>
+          </div>
+        )}
         <CardTitle className="mt-4 text-xl leading-relaxed">
           {currentQuestion.question}
         </CardTitle>
