@@ -5,8 +5,26 @@
 type OutlierStrategy = (signatures: string[]) => number;
 
 /**
+ * Priority score for different style indicators.
+ * Font color is most likely to indicate correct answer.
+ * Background/fill is often just formatting noise.
+ */
+const getSignaturePriority = (sig: string): number => {
+  // Font color (fc-argb) is the strongest indicator of correct answer
+  if (sig.includes("fc-argb:")) return 100;
+  // Theme font color is also good
+  if (sig.includes("fc-theme:") && !sig.includes("fc-theme:1")) return 90;
+  // Bold text
+  if (sig.includes("bold:true")) return 80;
+  // Background fill is lower priority (often just formatting)
+  if (sig.includes("bg-argb:") || sig.includes("bg-theme:")) return 10;
+  return 0;
+};
+
+/**
  * Finds the outlier by looking for the least frequent signature.
- * This is the default strategy - works well when one answer is highlighted differently.
+ * When multiple signatures have the same min frequency, prioritizes
+ * font color changes over background changes.
  *
  * @example
  * findByMinFrequency(['default', 'default', 'bold', 'default']) // returns 2
@@ -24,19 +42,36 @@ const findByMinFrequency: OutlierStrategy = (signatures) => {
   // If all signatures are the same, return 0 (no outlier found)
   if (counts.size === 1) return 0;
 
-  // Find the signature that appears least (ideally just once)
+  // Find the minimum count
   let minCount = Infinity;
-  let minSig = "";
-
-  counts.forEach((count, sig) => {
-    if (count < minCount) {
-      minCount = count;
-      minSig = sig;
-    }
+  counts.forEach((count) => {
+    if (count < minCount) minCount = count;
   });
 
-  // Return the first index with that signature
-  return signatures.findIndex((sig) => sig === minSig);
+  // Get all signatures with min count
+  const minSignatures: string[] = [];
+  counts.forEach((count, sig) => {
+    if (count === minCount) minSignatures.push(sig);
+  });
+
+  // If only one signature has min count, use it
+  if (minSignatures.length === 1) {
+    return signatures.findIndex((sig) => sig === minSignatures[0]);
+  }
+
+  // Multiple candidates - pick the one with highest priority (font color > background)
+  let bestSig = minSignatures[0];
+  let bestPriority = getSignaturePriority(minSignatures[0]);
+
+  for (const sig of minSignatures) {
+    const priority = getSignaturePriority(sig);
+    if (priority > bestPriority) {
+      bestPriority = priority;
+      bestSig = sig;
+    }
+  }
+
+  return signatures.findIndex((sig) => sig === bestSig);
 };
 
 /**
